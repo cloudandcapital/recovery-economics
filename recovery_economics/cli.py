@@ -241,6 +241,8 @@ def _emit_csv(workloads: List[WorkloadCost], stdout: TextIO) -> None:
         "monthly_storage_cost",
         "monthly_restore_cost",
         "total_monthly_resilience_cost",
+        "cost_per_gb",
+        "cost_per_backup",
     ]
     writer = csv.DictWriter(stdout, fieldnames=fieldnames, lineterminator="\n")
     writer.writeheader()
@@ -252,6 +254,8 @@ def _emit_csv(workloads: List[WorkloadCost], stdout: TextIO) -> None:
                 "monthly_storage_cost": workload.monthly_storage_cost,
                 "monthly_restore_cost": workload.monthly_restore_cost,
                 "total_monthly_resilience_cost": workload.total_monthly_resilience_cost,
+                "cost_per_gb": workload.cost_per_gb,
+                "cost_per_backup": workload.cost_per_backup,
             }
         )
 
