@@ -66,6 +66,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Column name for workload identifiers.",
     )
 
+    compare = subparsers.add_parser(
+        "compare",
+        help="Compare monthly cost delta between two scenario CSV files.",
+    )
+    compare.add_argument(
+        "--baseline",
+        required=True,
+        help="Path to the baseline scenario CSV file.",
+    )
+    compare.add_argument(
+        "--proposed",
+        required=True,
+        help="Path to the proposed scenario CSV file.",
+    )
+    compare.add_argument(
+        "--workload-column",
+        default=DEFAULT_WORKLOAD_COLUMN,
+        help="Column name for workload identifiers.",
+    )
+
     return parser
 
 
@@ -236,6 +256,48 @@ def _emit_csv(workloads: List[WorkloadCost], stdout: TextIO) -> None:
         )
 
 
+def run_compare(baseline_file: str, proposed_file: str, workload_column: str, stdout: TextIO) -> int:
+    baseline_inputs = load_workloads(input_file=baseline_file, workload_column=workload_column)
+    proposed_inputs = load_workloads(input_file=proposed_file, workload_column=workload_column)
+
+    baseline_costs = {c.workload: calculate_workload_cost(c) for c in baseline_inputs}
+    proposed_costs = {c.workload: calculate_workload_cost(c) for c in proposed_inputs}
+
+    all_workloads = sorted(set(baseline_costs) | set(proposed_costs))
+
+    rows = []
+    for workload in all_workloads:
+        b = baseline_costs.get(workload)
+        p = proposed_costs.get(workload)
+        b_total = b.total_monthly_resilience_cost if b else 0.0
+        p_total = p.total_monthly_resilience_cost if p else 0.0
+        delta = p_total - b_total
+        rows.append((workload, b_total, p_total, delta))
+
+    rows.sort(key=lambda r: abs(r[3]), reverse=True)
+
+    col_w = max(len(r[0]) for r in rows) if rows else 10
+    col_w = max(col_w, 8)
+    header = f"{'Workload':<{col_w}}  {'Baseline':>12}  {'Proposed':>12}  {'Delta':>12}"
+    sep = "-" * len(header)
+    stdout.write(f"Scenario comparison: {baseline_file}  vs  {proposed_file}\n")
+    stdout.write(f"{sep}\n{header}\n{sep}\n")
+    for workload, b_total, p_total, delta in rows:
+        sign = "+" if delta >= 0 else ""
+        stdout.write(
+            f"{workload:<{col_w}}  ${b_total:>11.2f}  ${p_total:>11.2f}  {sign}${delta:>10.2f}\n"
+        )
+    stdout.write(f"{sep}\n")
+    total_b = sum(r[1] for r in rows)
+    total_p = sum(r[2] for r in rows)
+    total_d = total_p - total_b
+    sign = "+" if total_d >= 0 else ""
+    stdout.write(
+        f"{'TOTAL':<{col_w}}  ${total_b:>11.2f}  ${total_p:>11.2f}  {sign}${total_d:>10.2f}\n"
+    )
+    return EXIT_SUCCESS
+
+
 def run_analyze(input_file: str, output_format: str, workload_column: str, stdout: TextIO) -> int:
     workload_inputs = load_workloads(input_file=input_file, workload_column=workload_column)
     workload_costs = [calculate_workload_cost(config) for config in workload_inputs]
@@ -266,6 +328,13 @@ def run(argv: Sequence[str] | None = None, stdout: TextIO = sys.stdout, stderr: 
             return run_analyze(
                 input_file=args.input,
                 output_format=args.output_format,
+                workload_column=args.workload_column,
+                stdout=stdout,
+            )
+        if args.command == "compare":
+            return run_compare(
+                baseline_file=args.baseline,
+                proposed_file=args.proposed,
                 workload_column=args.workload_column,
                 stdout=stdout,
             )

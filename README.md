@@ -1,19 +1,33 @@
 # Recovery Economics
 
-Recovery Economics is a small, deterministic CLI for modeling **monthly resilience cost** from local backup/restore configuration data.
+**Part of the Visibility → Variance → Tradeoffs pipeline.**
 
-This repository is currently scoped to **v0.1**:
+| Tool | Role | Repo |
+|------|------|------|
+| FinOps Lite | Cost visibility — pull AWS spend, compare periods, export FOCUS 1.0 CSV | [dianuhs/finops-lite](https://github.com/dianuhs/finops-lite) |
+| FinOps Watchdog | Anomaly detection — detect spend spikes from any cost CSV | [dianuhs/finops-watchdog](https://github.com/dianuhs/finops-watchdog) |
+| **Recovery Economics** | Resilience modeling — model backup/restore costs and compare scenarios | [dianuhs/recovery-economics](https://github.com/dianuhs/recovery-economics) |
+| Cloud Cost Guard | Dashboard — turn cloud bills into clear actions | [dianuhs/cloud-cost-guard](https://github.com/dianuhs/cloud-cost-guard) |
+
+These four tools form one production FinOps pipeline built for finance and engineering teams: pull raw cost data → detect anomalies → model resilience tradeoffs → surface everything in a decision-ready dashboard.
+
+---
+
+**Recovery Economics** is a deterministic CLI for modeling monthly resilience cost from backup/restore configuration data — and comparing cost deltas between scenarios (e.g. current vs. proposed retention policy).
+
+## v0.1 Scope
 
 - CSV in
 - machine-readable output (JSON, YAML, or CSV)
+- `--compare` flag for side-by-side scenario comparison
 - no cloud API calls
 - explicit exit codes
 
-## v0.1 scope
+## Analyze Command
 
 Given a CSV with one row per workload, the CLI computes per-workload and aggregate monthly cost.
 
-### Required input columns
+### Required Input Columns
 
 - `workload` (or custom name via `--workload-column`)
 - `data_gb`
@@ -34,9 +48,9 @@ For each workload:
 
 Costs are rounded to 2 decimals.
 
-## CLI contract
+## CLI Contract
 
-### Command
+### Analyze a Single Scenario
 
 ```bash
 recovery-economics analyze \
@@ -46,9 +60,21 @@ recovery-economics analyze \
 
 `python -m recovery_economics ...` is also supported.
 
+### Compare Two Scenarios
+
+Use `--compare` to show the monthly cost delta between two CSV configurations side by side — useful for evaluating changes to retention policy, backup frequency, or storage tier:
+
+```bash
+recovery-economics compare \
+  --baseline current_config.csv \
+  --proposed reduced_retention.csv
+```
+
+Output shows per-workload costs for each scenario and the delta (proposed minus baseline), sorted by absolute delta descending.
+
 ### Flags
 
-Required:
+**analyze** — Required:
 
 - `--input` : path to CSV file
 - `--output-format` : `json` | `yaml` | `csv`
@@ -57,7 +83,16 @@ Optional:
 
 - `--workload-column` : defaults to `workload`
 
-## Output contract
+**compare** — Required:
+
+- `--baseline` : path to baseline CSV file
+- `--proposed` : path to proposed CSV file
+
+Optional:
+
+- `--workload-column` : defaults to `workload`
+
+## Output Contract
 
 ### JSON / YAML
 
@@ -69,12 +104,6 @@ Optional:
 - `summary`
 - `workloads` (array)
 
-If the CSV has a valid header and zero data rows, output is still valid with:
-
-- `summary.total_workloads = 0`
-- zero totals
-- `workloads = []`
-
 ### CSV
 
 `csv` emits one row per workload with:
@@ -84,25 +113,13 @@ If the CSV has a valid header and zero data rows, output is still valid with:
 - `monthly_restore_cost`
 - `total_monthly_resilience_cost`
 
-Stdout contains only the payload for all formats.
-
-## Exit codes
+## Exit Codes
 
 - `0` = success
 - `2` = CLI usage error (missing/invalid flags)
 - `3` = input file error (not found/unreadable)
 - `4` = schema/data error (missing columns, non-numeric values, invalid values)
 - `5` = internal/runtime error
-
-High modeled cost is data, not an error.
-
-## Out of scope in v0.1
-
-- cloud API calls or pricing API calls
-- storage-class price lookups
-- direct RPO/RTO modeling
-- simulation/time-travel modeling
-- daemon/scheduler/alerting behavior
 
 ## Development
 
@@ -117,3 +134,12 @@ Run tests:
 ```bash
 pytest
 ```
+
+## Pipeline
+
+Recovery Economics is step three. Typical flow:
+
+1. **[FinOps Lite](https://github.com/dianuhs/finops-lite)** exports a FOCUS 1.0 CSV from AWS Cost Explorer
+2. **[FinOps Watchdog](https://github.com/dianuhs/finops-watchdog)** detects anomalies in that CSV
+3. **Recovery Economics** models resilience cost and compares scenarios
+4. **[Cloud Cost Guard](https://github.com/dianuhs/cloud-cost-guard)** surfaces all of this in a dashboard
