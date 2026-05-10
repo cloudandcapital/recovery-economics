@@ -52,6 +52,8 @@ class WorkloadCost:
     monthly_storage_cost: float
     monthly_restore_cost: float
     total_monthly_resilience_cost: float
+    cost_per_gb: float
+    cost_per_backup: float
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -66,6 +68,8 @@ class WorkloadCost:
             "monthly_storage_cost": self.monthly_storage_cost,
             "monthly_restore_cost": self.monthly_restore_cost,
             "total_monthly_resilience_cost": self.total_monthly_resilience_cost,
+            "cost_per_gb": self.cost_per_gb,
+            "cost_per_backup": self.cost_per_backup,
         }
 
 
@@ -78,6 +82,14 @@ def calculate_workload_cost(config: WorkloadConfig) -> WorkloadCost:
     )
     monthly_restore_cost = config.restore_gb_per_month * config.restore_rate_per_gb
     total_monthly_resilience_cost = monthly_storage_cost + monthly_restore_cost
+
+    total_rounded = _round_money(total_monthly_resilience_cost)
+    cost_per_gb = _round_money(total_rounded / config.data_gb) if config.data_gb > 0 else 0.0
+    cost_per_backup = (
+        _round_money(total_rounded / config.backup_frequency_per_month)
+        if config.backup_frequency_per_month > 0
+        else 0.0
+    )
 
     return WorkloadCost(
         workload=config.workload,
@@ -92,7 +104,9 @@ def calculate_workload_cost(config: WorkloadConfig) -> WorkloadCost:
         ),
         monthly_storage_cost=_round_money(monthly_storage_cost),
         monthly_restore_cost=_round_money(monthly_restore_cost),
-        total_monthly_resilience_cost=_round_money(total_monthly_resilience_cost),
+        total_monthly_resilience_cost=total_rounded,
+        cost_per_gb=cost_per_gb,
+        cost_per_backup=cost_per_backup,
     )
 
 

@@ -1,24 +1,34 @@
-# Recovery Economics examples
+# Examples
 
-A few quick examples of how to run the CLI once the package is installed
-(or from the repo root with `python -m recovery_economics.cli`).
+This directory contains two scenario CSVs: the current backup configuration and a proposed reduced-retention configuration.
 
-## 1. Compare ransomware strategies (scenario file)
+## Analyze a single scenario
 
 ```bash
-recovery-economics \  --scenario-file scenarios/ransomware_fast_recovery.yml \  --compare-strategies
+recovery-economics analyze \
+  --input examples/workload-config-sample.csv \
+  --output-format json
 ```
 
-## 2. Single strategy, JSON output
+The output includes `cost_per_gb` and `cost_per_backup` per workload so you can rank workloads by efficiency — useful when deciding which ones to prioritize for retention reduction.
+
+## Compare two scenarios
 
 ```bash
-recovery-economics \  --scenario-file scenarios/ransomware_fast_recovery.yml \  --strategy ai_assisted \  --json
+recovery-economics compare \
+  --baseline examples/workload-config-sample.csv \
+  --proposed examples/proposed-config-sample.csv
 ```
 
-## 3. AI decision narrative (requires OPENAI_API_KEY)
+Expected output:
 
-```bash
-export OPENAI_API_KEY=your_key_here
-
-recovery-economics \  --scenario-file scenarios/ransomware_fast_recovery.yml \  --strategy hybrid \  --ai-narrative
+```
+Scenario comparison: examples/workload-config-sample.csv  vs  examples/proposed-config-sample.csv
+Workload                   Baseline      Proposed         Delta
+user-db                   $4993.20     $2500.20     -$2493.00
+analytics-warehouse       $1766.40      $883.20      -$883.20
+audit-logs                $3456.00     $1152.00     -$2304.00
+media-assets               $386.40      $193.20      -$193.20
+orders-api                 $277.60      $138.80      -$138.80
+TOTAL                    $10879.60     $4867.40     -$6012.20
 ```
