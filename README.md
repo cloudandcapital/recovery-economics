@@ -1,119 +1,105 @@
 # Recovery Economics
 
-Recovery Economics is a small, deterministic CLI for modeling **monthly resilience cost** from local backup/restore configuration data.
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Multi-cloud](https://img.shields.io/badge/cloud-AWS%20%7C%20Azure%20%7C%20GCP-orange)](https://github.com/cloudandcapital/recovery-economics)
 
-This repository is currently scoped to **v0.1**:
+**FinOps decision-stress model — estimate the true monthly cost and time of cloud recovery, per workload.**
 
-- CSV in
-- machine-readable output (JSON, YAML, or CSV)
-- no cloud API calls
-- explicit exit codes
+Part of the [Cloud & Capital](https://github.com/cloudandcapital) FinOps pipeline.  
+Resilience cost output feeds into [Cloud Cost Guard](https://github.com/cloudandcapital/cloud-cost-guard) — the unified FinOps dashboard.
 
-## v0.1 scope
+---
 
-Given a CSV with one row per workload, the CLI computes per-workload and aggregate monthly cost.
+**Features:**
+- CSV-in, machine-readable output — no cloud API calls, no setup friction
+- Per-workload monthly resilience cost: backup storage + restore compute + egress
+- Scenario comparison — compare two configurations side by side with delta analysis
+- RPO/RTO modeling — surface the cost of meeting your recovery objectives
+- JSON, YAML, and CSV output — pipe-friendly with explicit exit codes
+- Evals mode for automated validation of model assumptions
 
-### Required input columns
+---
 
-- `workload` (or custom name via `--workload-column`)
-- `data_gb`
-- `backup_frequency_per_month`
-- `retention_months`
-- `storage_rate_per_gb_month`
-- `restore_gb_per_month`
-- `restore_rate_per_gb`
-
-### Formulas
-
-For each workload:
-
-- `effective_backups_kept = backup_frequency_per_month * retention_months`
-- `monthly_storage_cost = data_gb * backup_frequency_per_month * retention_months * storage_rate_per_gb_month`
-- `monthly_restore_cost = restore_gb_per_month * restore_rate_per_gb`
-- `total_monthly_resilience_cost = monthly_storage_cost + monthly_restore_cost`
-
-Costs are rounded to 2 decimals.
-
-## CLI contract
-
-### Command
+## Install
 
 ```bash
-recovery-economics analyze \
-  --input tests/fixtures/simple_config.csv \
-  --output-format json
+pip install "git+https://github.com/cloudandcapital/recovery-economics.git"
+# or
+pipx install .
 ```
 
-`python -m recovery_economics ...` is also supported.
+---
 
-### Flags
-
-Required:
-
-- `--input` : path to CSV file
-- `--output-format` : `json` | `yaml` | `csv`
-
-Optional:
-
-- `--workload-column` : defaults to `workload`
-
-## Output contract
-
-### JSON / YAML
-
-`json` and `yaml` emit the same structure:
-
-- `schema_version` (constant: `"1.0"`)
-- `metadata.generated_at` (UTC ISO-8601)
-- `metadata.input_file`
-- `summary`
-- `workloads` (array)
-
-If the CSV has a valid header and zero data rows, output is still valid with:
-
-- `summary.total_workloads = 0`
-- zero totals
-- `workloads = []`
-
-### CSV
-
-`csv` emits one row per workload with:
-
-- `workload`
-- `monthly_storage_cost`
-- `monthly_restore_cost`
-- `total_monthly_resilience_cost`
-
-Stdout contains only the payload for all formats.
-
-## Exit codes
-
-- `0` = success
-- `2` = CLI usage error (missing/invalid flags)
-- `3` = input file error (not found/unreadable)
-- `4` = schema/data error (missing columns, non-numeric values, invalid values)
-- `5` = internal/runtime error
-
-High modeled cost is data, not an error.
-
-## Out of scope in v0.1
-
-- cloud API calls or pricing API calls
-- storage-class price lookups
-- direct RPO/RTO modeling
-- simulation/time-travel modeling
-- daemon/scheduler/alerting behavior
-
-## Development
-
-Install locally:
+## Usage
 
 ```bash
-pip install -e .
+# Model recovery cost for a set of workloads
+recovery-economics model --workload workloads.csv
+
+# Compare two recovery configurations
+recovery-economics compare --baseline current.csv --alternative proposed.csv
+
+# JSON output (feeds Cloud Cost Guard report.json)
+recovery-economics model --workload workloads.csv --format json
+
+# YAML output
+recovery-economics model --workload workloads.csv --format yaml
 ```
 
-Run tests:
+---
 
-```bash
-pytest
+## Input CSV Format
+
+One row per workload:
+
+| Column | Description |
+|--------|-------------|
+| `workload` | Workload name |
+| `data_gb` | Total data size in GB |
+| `backup_frequency_per_month` | Number of backup cycles per month |
+| `backup_storage_tier` | `standard`, `infrequent`, or `archive` |
+| `restore_compute_hours` | Expected compute hours per restore |
+| `egress_gb_per_restore` | Data egress per restore in GB |
+| `rpo_hours` *(optional)* | Recovery point objective |
+| `rto_hours` *(optional)* | Recovery time objective |
+
+---
+
+## Output
+
+```json
+{
+  "total_workloads": 5,
+  "total_monthly_resilience_cost": 4820.50,
+  "top_workloads": [
+    {
+      "workload": "prod-postgres",
+      "monthly_storage_cost": 1240.00,
+      "monthly_restore_cost": 380.00,
+      "total_monthly_resilience_cost": 1620.00,
+      "rpo_hours": 4,
+      "rto_hours": 2
+    }
+  ]
+}
 ```
+
+---
+
+## Part of the Cloud & Capital Pipeline
+
+| Tool | Role |
+|------|------|
+| [FinOps Lite](https://github.com/cloudandcapital/finops-lite) | Cost pull + FOCUS 2026 export |
+| [FinOps Watchdog](https://github.com/cloudandcapital/finops-watchdog) | Anomaly detection |
+| **Recovery Economics** | Resilience cost modeling |
+| [Cloud Cost Guard](https://github.com/cloudandcapital/cloud-cost-guard) | Unified dashboard |
+| [AI Cost Lens](https://github.com/cloudandcapital/ai-cost-lens) | AI/LLM spend tracking |
+| [SaaS Cost Analyzer](https://github.com/cloudandcapital/saas-cost-analyzer) | SaaS license governance |
+| [Tech Spend Command Center](https://github.com/cloudandcapital/tech-spend-command-center) | Executive reporting |
+
+---
+
+## License
+
+MIT © 2025 Diana Molski, Cloud & Capital
